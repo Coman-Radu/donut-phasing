@@ -1,0 +1,52 @@
+{
+  "microphones": {
+    "positions": [
+      [0.0, 0.0],
+      [1.0, 0.0],
+      [0.5, 0.866],
+      [0.5, -0.866]
+    ],
+    "sensitivity": -40.0,
+    "frequency_response": {
+      "low_cutoff": 20.0,
+      "high_cutoff": 20000.0
+    },
+    "dynamic_range": 120.0,
+    "directionality": {
+      "type": "omnidirectional",
+      "pattern_coefficient": 0.0
+    },
+    "audio_transparency": 0.95,
+    "gps_sync": {
+      "enabled": true,
+      "clock_drift": 1e-9,
+      "sync_accuracy": 1e-8
+    }
+  },
+  "drone": {
+    "position": [2.5, 1.5],
+    "signal_type": "sine",
+    "signal_config": {
+      "sine": {
+        "frequency": 440.0,
+        "amplitude": 1.0
+      },
+      "complex": {
+        "fundamental_frequency": 220.0,
+        "harmonics": [1, 2, 3, 4],
+        "harmonic_amplitudes": [1.0, 0.5, 0.3, 0.2],
+        "phases": [0.0, 1.57, 3.14, 0.0]
+      },
+      "wav_file": {
+        "path": "drone_sound.wav",
+        "loop": true
+      }
+    }
+  },
+  "simulation": {
+    "sample_rate": 44100,
+    "duration": 2.0,
+    "noise_level": 0.01,
+    "speed_of_sound": 343.0
+  }
+}
