@@ -2,18 +2,42 @@
   "microphones": {
     "array_1": {
       "positions": [
-        [0.0, 0.0],
-        [50.0, 0.0],
-        [25.0, 43.3],
-        [25.0, -43.3]
+        [
+          0.0,
+          0.0
+        ],
+        [
+          50.0,
+          0.0
+        ],
+        [
+          25.0,
+          43.3
+        ],
+        [
+          25.0,
+          -43.3
+        ]
       ]
     },
     "array_2": {
       "positions": [
-        [200.0, 0.0],
-        [250.0, 0.0],
-        [225.0, 43.3],
-        [225.0, -43.3]
+        [
+          200.0,
+          0.0
+        ],
+        [
+          250.0,
+          0.0
+        ],
+        [
+          225.0,
+          43.3
+        ],
+        [
+          225.0,
+          -43.3
+        ]
       ]
     },
     "sensitivity": -40.0,
@@ -29,12 +53,15 @@
     "audio_transparency": 0.95,
     "gps_sync": {
       "enabled": true,
-      "clock_drift": 1e-9,
-      "sync_accuracy": 1e-8
+      "clock_drift": 1e-09,
+      "sync_accuracy": 1e-08
     }
   },
   "drone": {
-    "position": [200.0, 150.0],
+    "position": [
+      200.0,
+      150.0
+    ],
     "signal_type": "sine",
     "signal_config": {
       "sine": {
@@ -42,16 +69,6 @@
         "amplitude": 1.0,
         "pulse_width": 0.01,
         "pulse_interval": 0.1
-      },
-      "complex": {
-        "fundamental_frequency": 220.0,
-        "harmonics": [1, 2, 3, 4],
-        "harmonic_amplitudes": [1.0, 0.5, 0.3, 0.2],
-        "phases": [0.0, 1.57, 3.14, 0.0]
-      },
-      "wav_file": {
-        "path": "drone_sound.wav",
-        "loop": true
       }
     }
   },

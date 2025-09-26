@@ -86,57 +86,83 @@ class MicrophoneArray:
         else:
             config = config_dict
 
-        self.microphones = []
+        self.arrays = {}
         mic_config = config['microphones']
 
-        for pos in mic_config['positions']:
-            mic = Microphone(
-                position=pos,
-                sensitivity=mic_config['sensitivity'],
-                frequency_response=mic_config['frequency_response'],
-                dynamic_range=mic_config['dynamic_range'],
-                directionality=mic_config['directionality'],
-                audio_transparency=mic_config['audio_transparency'],
-                gps_sync=mic_config['gps_sync']
-            )
-            self.microphones.append(mic)
+        # Multi-array format only
+        for array_name in ['array_1', 'array_2']:
+            if array_name in mic_config:
+                self.arrays[array_name] = []
+                for pos in mic_config[array_name]['positions']:
+                    mic = Microphone(
+                        position=pos,
+                        sensitivity=mic_config['sensitivity'],
+                        frequency_response=mic_config['frequency_response'],
+                        dynamic_range=mic_config['dynamic_range'],
+                        directionality=mic_config['directionality'],
+                        audio_transparency=mic_config['audio_transparency'],
+                        gps_sync=mic_config['gps_sync']
+                    )
+                    self.arrays[array_name].append(mic)
 
-    def get_positions(self) -> np.ndarray:
-        return np.array([mic.position for mic in self.microphones])
+    def get_positions(self, array_name: str = 'array_1') -> np.ndarray:
+        return np.array([mic.position for mic in self.arrays[array_name]])
+
+    def get_all_positions(self) -> Dict[str, np.ndarray]:
+        return {array_name: self.get_positions(array_name) for array_name in self.arrays}
 
     def receive_signal(self, source_signal: np.ndarray, source_position: np.ndarray,
-                      sample_rate: int, speed_of_sound: float, noise_level: float = 0.0) -> List[np.ndarray]:
-        received_signals = []
+                      sample_rate: int, speed_of_sound: float, noise_level: float = 0.0) -> Dict[str, List[np.ndarray]]:
+        all_received_signals = {}
 
-        for mic in self.microphones:
-            # Calculate distance and time delay
-            distance = np.linalg.norm(source_position - mic.position)
-            time_delay = distance / speed_of_sound
-            sample_delay = int(time_delay * sample_rate)
+        # Find maximum delay to ensure all signals have same length
+        max_sample_delay = 0
+        delays = {}
 
-            # Apply time delay by zero-padding
-            delayed_signal = np.zeros(len(source_signal) + sample_delay)
-            delayed_signal[sample_delay:] = source_signal
+        for array_name, mics in self.arrays.items():
+            delays[array_name] = []
+            for mic in mics:
+                distance = np.linalg.norm(source_position - mic.position)
+                time_delay = distance / speed_of_sound
+                sample_delay = int(time_delay * sample_rate)
+                delays[array_name].append(sample_delay)
+                max_sample_delay = max(max_sample_delay, sample_delay)
 
-            # Calculate angle from microphone to source
-            direction_vector = source_position - mic.position
-            source_angle = np.arctan2(direction_vector[1], direction_vector[0])
+        for array_name, mics in self.arrays.items():
+            received_signals = []
+            for i, mic in enumerate(mics):
+                sample_delay = delays[array_name][i]
 
-            # Apply microphone characteristics
-            processed_signal = delayed_signal[:len(source_signal)]
-            processed_signal = mic.apply_sensitivity(processed_signal)
-            processed_signal = mic.apply_directionality(processed_signal, source_angle)
-            processed_signal = mic.apply_frequency_response(processed_signal, sample_rate)
-            processed_signal = mic.apply_transparency(processed_signal)
+                # Create signal with consistent length by padding to max_delay + original length
+                total_length = len(source_signal) + max_sample_delay
+                delayed_signal = np.zeros(total_length)
 
-            # Apply GPS synchronization errors
-            processed_signal = mic.apply_gps_sync_error(processed_signal, sample_rate)
+                # Place the source signal at the correct delay position
+                delayed_signal[sample_delay:sample_delay + len(source_signal)] = source_signal
 
-            # Add noise
-            if noise_level > 0:
-                noise = np.random.normal(0, noise_level, len(processed_signal))
-                processed_signal += noise
+                # Truncate to original signal length, keeping the end portion
+                # This preserves the relative delays between microphones
+                processed_signal = delayed_signal[-len(source_signal):]
 
-            received_signals.append(processed_signal)
+                # Calculate angle from microphone to source
+                direction_vector = source_position - mic.position
+                source_angle = np.arctan2(direction_vector[1], direction_vector[0])
 
-        return received_signals
+                processed_signal = mic.apply_sensitivity(processed_signal)
+                processed_signal = mic.apply_directionality(processed_signal, source_angle)
+                processed_signal = mic.apply_frequency_response(processed_signal, sample_rate)
+                processed_signal = mic.apply_transparency(processed_signal)
+
+                # Apply GPS synchronization errors
+                processed_signal = mic.apply_gps_sync_error(processed_signal, sample_rate)
+
+                # Add noise
+                if noise_level > 0:
+                    noise = np.random.normal(0, noise_level, len(processed_signal))
+                    processed_signal += noise
+
+                received_signals.append(processed_signal)
+
+            all_received_signals[array_name] = received_signals
+
+        return all_received_signals

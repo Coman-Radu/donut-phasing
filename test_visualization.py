@@ -20,17 +20,19 @@ def test_visualizations():
         system.duration, system.sample_rate
     )
 
-    mic_positions = system.microphone_array.get_positions()
-    received_signals = system.microphone_array.receive_signal(
+    all_mic_positions = system.microphone_array.get_all_positions()
+    all_received_signals = system.microphone_array.receive_signal(
         drone_signal, true_pos, system.sample_rate,
         system.speed_of_sound, system.noise_level
     )
 
     print("Creating visualizations...")
 
-    # 1. Wave arrivals plot
+    # 1. Wave arrivals plot for each array
     print("Plotting wave arrivals...")
-    system.plot_wave_arrivals(received_signals, true_pos)
+    for array_name, received_signals in all_received_signals.items():
+        print(f"  - {array_name} wave arrivals")
+        system.plot_wave_arrivals(received_signals, true_pos, array_name)
 
     # 2. TDOA analysis plot
     print("Plotting TDOA analysis...")

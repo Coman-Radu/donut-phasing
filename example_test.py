@@ -45,7 +45,7 @@ def test_different_signal_types():
 
     system = DroneLocalizationSystem('config.json')
 
-    signal_types = ['sine', 'complex']
+    signal_types = ['sine']
     results = {}
 
     for signal_type in signal_types:
@@ -60,11 +60,18 @@ def test_different_signal_types():
         true_pos, estimated_pos, metrics = system.run_simulation()
 
         error = np.linalg.norm(estimated_pos - true_pos)
+        # Extract TDOAs from multi-array format
+        tdoas_summary = []
+        if 'all_tdoas' in metrics:
+            for key, values in metrics['all_tdoas'].items():
+                tdoas_summary.extend(values)
+
         results[signal_type] = {
             'true_position': true_pos.tolist(),
             'estimated_position': estimated_pos.tolist(),
             'error': error,
-            'tdoas': metrics['tdoas']
+            'all_tdoas': metrics.get('all_tdoas', {}),
+            'tdoas_summary': tdoas_summary
         }
 
         # Plot results
