@@ -35,7 +35,30 @@ class DroneSignalGenerator:
         frequency = config['frequency']
         amplitude = config['amplitude']
 
-        return amplitude * np.sin(2 * np.pi * frequency * t)
+        # Add pulse parameters
+        pulse_width = config.get('pulse_width', 0.1)  # Default 0.1 seconds
+        pulse_interval = config.get('pulse_interval', 0.5)  # Default 0.5 seconds
+
+        # Generate continuous sine wave
+        sine_wave = amplitude * np.sin(2 * np.pi * frequency * t)
+
+        # Create pulse mask
+        pulse_mask = np.zeros_like(t)
+        current_time = 0
+
+        while current_time < t[-1]:
+            # Find indices within pulse duration
+            pulse_start_idx = int(current_time * len(t) / t[-1])
+            pulse_end_idx = int((current_time + pulse_width) * len(t) / t[-1])
+            pulse_end_idx = min(pulse_end_idx, len(t))
+
+            # Enable pulse
+            pulse_mask[pulse_start_idx:pulse_end_idx] = 1
+
+            # Move to next pulse
+            current_time += pulse_interval
+
+        return sine_wave * pulse_mask
 
     def _generate_complex_wave(self, t: np.ndarray) -> np.ndarray:
         config = self.signal_config['complex']

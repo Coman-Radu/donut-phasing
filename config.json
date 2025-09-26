@@ -2,9 +2,9 @@
   "microphones": {
     "positions": [
       [0.0, 0.0],
-      [1.0, 0.0],
-      [0.5, 0.866],
-      [0.5, -0.866]
+      [50.0, 0.0],
+      [25.0, 43.3],
+      [25.0, -43.3]
     ],
     "sensitivity": -40.0,
     "frequency_response": {
@@ -24,12 +24,14 @@
     }
   },
   "drone": {
-    "position": [2.5, 1.5],
+    "position": [200.0, 150.0],
     "signal_type": "sine",
     "signal_config": {
       "sine": {
-        "frequency": 440.0,
-        "amplitude": 1.0
+        "frequency": 1000.0,
+        "amplitude": 1.0,
+        "pulse_width": 0.01,
+        "pulse_interval": 0.1
       },
       "complex": {
         "fundamental_frequency": 220.0,

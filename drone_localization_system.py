@@ -104,6 +104,178 @@ class DroneLocalizationSystem:
         plt.axis('equal')
         plt.show()
 
+    def plot_tdoa_analysis(self, true_position: np.ndarray, estimated_position: np.ndarray, quality_metrics: Dict):
+        """Plot TDOA analysis including hyperbolas and correlation data."""
+        mic_positions = self.microphone_array.get_positions()
+        tdoas = np.array(quality_metrics['tdoas'])
+
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+
+        # Plot 1: Hyperbolic curves from TDOA measurements
+        ax1.set_title('TDOA Hyperbolas and Localization')
+
+        # Create grid for hyperbola plotting (adjusted for larger scale)
+        x_range = np.linspace(-50, 300, 200)
+        y_range = np.linspace(-100, 250, 200)
+        X, Y = np.meshgrid(x_range, y_range)
+
+        # Plot hyperbolas for each TDOA measurement
+        colors = ['red', 'green', 'blue']
+        for i, tdoa in enumerate(tdoas):
+            if i < len(colors):
+                # Calculate theoretical hyperbola
+                mic0 = mic_positions[0]
+                mic_i = mic_positions[i+1]
+
+                # Distance differences
+                d0 = np.sqrt((X - mic0[0])**2 + (Y - mic0[1])**2)
+                di = np.sqrt((X - mic_i[0])**2 + (Y - mic_i[1])**2)
+
+                # TDOA hyperbola equation: di - d0 = c * tdoa
+                hyperbola = di - d0 - self.speed_of_sound * tdoa
+
+                # Plot contour where hyperbola = 0
+                ax1.contour(X, Y, hyperbola, levels=[0], colors=[colors[i]],
+                           linewidths=2, alpha=0.7,
+                           label=f'TDOA {i+1}: {tdoa:.4f}s')
+
+        # Plot microphones and positions
+        ax1.scatter(mic_positions[:, 0], mic_positions[:, 1],
+                   c='blue', s=100, marker='^', label='Microphones', zorder=5)
+        ax1.scatter(true_position[0], true_position[1],
+                   c='red', s=150, marker='o', facecolors='none',
+                   edgecolors='red', linewidth=2, label='True Position', zorder=5)
+        ax1.scatter(estimated_position[0], estimated_position[1],
+                   c='green', s=150, marker='x', linewidth=3, label='Estimated', zorder=5)
+
+        ax1.set_xlabel('X Position (m)')
+        ax1.set_ylabel('Y Position (m)')
+        ax1.legend()
+        ax1.grid(True, alpha=0.3)
+        ax1.axis('equal')
+
+        # Plot 2: TDOA values comparison
+        ax2.set_title('TDOA Measurements vs Theoretical')
+        theoretical_tdoas = self.localizer.calculate_theoretical_tdoas(true_position, mic_positions)
+
+        mic_pairs = [f'Mic 0-{i+1}' for i in range(len(tdoas))]
+        x_pos = np.arange(len(mic_pairs))
+
+        width = 0.35
+        ax2.bar(x_pos - width/2, tdoas, width, label='Measured TDOA', alpha=0.7)
+        ax2.bar(x_pos + width/2, theoretical_tdoas, width, label='Theoretical TDOA', alpha=0.7)
+
+        ax2.set_xlabel('Microphone Pairs')
+        ax2.set_ylabel('TDOA (seconds)')
+        ax2.set_xticks(x_pos)
+        ax2.set_xticklabels(mic_pairs)
+        ax2.legend()
+        ax2.grid(True, alpha=0.3)
+
+        # Plot 3: Distance visualization
+        ax3.set_title('Distance from Drone to Each Microphone')
+        distances_true = [np.linalg.norm(true_position - mic) for mic in mic_positions]
+        distances_est = [np.linalg.norm(estimated_position - mic) for mic in mic_positions]
+
+        mic_labels = [f'Mic {i}' for i in range(len(mic_positions))]
+        x_pos = np.arange(len(mic_labels))
+
+        ax3.bar(x_pos - width/2, distances_true, width, label='True Distances', alpha=0.7)
+        ax3.bar(x_pos + width/2, distances_est, width, label='Estimated Distances', alpha=0.7)
+
+        ax3.set_xlabel('Microphones')
+        ax3.set_ylabel('Distance (m)')
+        ax3.set_xticks(x_pos)
+        ax3.set_xticklabels(mic_labels)
+        ax3.legend()
+        ax3.grid(True, alpha=0.3)
+
+        # Plot 4: Error analysis
+        ax4.set_title('TDOA Error Analysis')
+        tdoa_errors = tdoas - theoretical_tdoas
+
+        ax4.bar(mic_pairs, tdoa_errors, alpha=0.7, color='red')
+        ax4.axhline(y=0, color='black', linestyle='-', alpha=0.5)
+        ax4.set_xlabel('Microphone Pairs')
+        ax4.set_ylabel('TDOA Error (seconds)')
+        ax4.grid(True, alpha=0.3)
+
+        # Add error statistics text
+        mean_error = np.mean(np.abs(tdoa_errors))
+        max_error = np.max(np.abs(tdoa_errors))
+        ax4.text(0.02, 0.95, f'Mean |Error|: {mean_error:.6f}s\nMax |Error|: {max_error:.6f}s',
+                transform=ax4.transAxes, verticalalignment='top',
+                bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+        plt.tight_layout()
+        plt.show()
+
+    def plot_wave_arrivals(self, received_signals: List[np.ndarray], true_position: np.ndarray):
+        """Plot the wave arrivals at each microphone with time delays."""
+        mic_positions = self.microphone_array.get_positions()
+
+        # Calculate theoretical arrival times
+        distances = [np.linalg.norm(true_position - mic_pos) for mic_pos in mic_positions]
+        arrival_times = [d / self.speed_of_sound for d in distances]
+
+        # Create time axis
+        duration = len(received_signals[0]) / self.sample_rate
+        time_axis = np.linspace(0, duration, len(received_signals[0]))
+
+        fig, axes = plt.subplots(len(received_signals), 1, figsize=(12, 8))
+        if len(received_signals) == 1:
+            axes = [axes]
+
+        # Find global min/max for consistent y-axis scaling
+        global_min = min(np.min(sig) for sig in received_signals)
+        global_max = max(np.max(sig) for sig in received_signals)
+
+        for i, (signal, ax) in enumerate(zip(received_signals, axes)):
+            # Plot the received signal
+            ax.plot(time_axis, signal, 'b-', linewidth=1, alpha=0.8)
+
+            # Mark theoretical arrival time
+            ax.axvline(x=arrival_times[i], color='red', linestyle='--',
+                      linewidth=2, alpha=0.7, label=f'Expected arrival: {arrival_times[i]:.4f}s')
+
+            # Mark signal start (first significant peak)
+            signal_energy = signal ** 2
+            threshold = 0.1 * np.max(signal_energy)
+            signal_start_idx = np.where(signal_energy > threshold)[0]
+
+            if len(signal_start_idx) > 0:
+                actual_arrival_time = time_axis[signal_start_idx[0]]
+                ax.axvline(x=actual_arrival_time, color='green', linestyle='-',
+                          linewidth=2, alpha=0.7, label=f'Detected arrival: {actual_arrival_time:.4f}s')
+
+                # Calculate time difference
+                time_diff = actual_arrival_time - arrival_times[i]
+                ax.text(0.02, 0.95, f'Time diff: {time_diff:.4f}s\nDistance: {distances[i]:.2f}m',
+                       transform=ax.transAxes, verticalalignment='top',
+                       bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.8))
+
+            ax.set_ylabel(f'Mic {i}\nAmplitude')
+            ax.set_ylim(global_min * 1.1, global_max * 1.1)
+            ax.grid(True, alpha=0.3)
+            ax.legend(loc='upper right')
+
+            # Highlight pulse regions
+            if hasattr(self.drone_signal_generator.signal_config.get('sine', {}), '__contains__'):
+                if 'pulse_interval' in self.drone_signal_generator.signal_config['sine']:
+                    pulse_interval = self.drone_signal_generator.signal_config['sine']['pulse_interval']
+                    pulse_width = self.drone_signal_generator.signal_config['sine']['pulse_width']
+
+                    current_time = arrival_times[i]
+                    while current_time < duration:
+                        ax.axvspan(current_time, current_time + pulse_width,
+                                  alpha=0.2, color='yellow', label='Expected pulse' if current_time == arrival_times[i] else '')
+                        current_time += pulse_interval
+
+        axes[-1].set_xlabel('Time (seconds)')
+        plt.suptitle(f'Wave Arrivals at Microphones\nDrone at ({true_position[0]:.2f}, {true_position[1]:.2f})')
+        plt.tight_layout()
+        plt.show()
+
     def update_drone_position(self, new_position: List[float]):
         """Update drone position for multiple runs."""
         self.drone_signal_generator.update_position(np.array(new_position))

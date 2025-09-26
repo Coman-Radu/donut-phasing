@@ -32,13 +32,18 @@ class TDOALocalizer:
         return time_delay
 
     def calculate_all_tdoas(self, received_signals: List[np.ndarray]) -> np.ndarray:
-        """Calculate TDOAs between all microphone pairs."""
+        """Calculate TDOAs between all microphone pairs using cross-correlation."""
         n_mics = len(received_signals)
         tdoas = []
 
         # Use first microphone as reference
         for i in range(1, n_mics):
-            tdoa = self.cross_correlation_tdoa(received_signals[0], received_signals[i])
+            # Apply windowing to reduce edge effects for pulsed signals
+            window = np.hanning(len(received_signals[0]))
+            sig1_windowed = received_signals[0] * window
+            sig2_windowed = received_signals[i] * window
+
+            tdoa = self.cross_correlation_tdoa(sig1_windowed, sig2_windowed)
             tdoas.append(tdoa)
 
         return np.array(tdoas)
