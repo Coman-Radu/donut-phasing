@@ -5,6 +5,7 @@ from typing import Dict, Tuple, List
 from microphone_array import MicrophoneArray
 from drone_signal import DroneSignalGenerator
 from tdoa_localization import TDOALocalizer
+from aoa_localization import AOALocalizer
 
 
 class DroneLocalizationSystem:
@@ -14,7 +15,8 @@ class DroneLocalizationSystem:
 
         self.microphone_array = MicrophoneArray(config_dict=self.config)
         self.drone_signal_generator = DroneSignalGenerator(config_dict=self.config)
-        self.localizer = TDOALocalizer(config_dict=self.config)
+        self.tdoa_localizer = TDOALocalizer(config_dict=self.config)
+        self.aoa_localizer = AOALocalizer(config_dict=self.config)
 
         # Simulation parameters
         self.sample_rate = self.config['simulation']['sample_rate']
@@ -46,10 +48,32 @@ class DroneLocalizationSystem:
         )
 
         print("Performing TDOA localization...")
-        # Perform localization
-        estimated_position, quality_metrics = self.localizer.localize(
+        # Perform TDOA localization
+        tdoa_position, tdoa_metrics = self.tdoa_localizer.localize(
             received_signals, mic_positions
         )
+
+        print("Performing AOA localization...")
+        # Perform AOA localization
+        aoa_position, aoa_metrics = self.aoa_localizer.localize(
+            received_signals, mic_positions
+        )
+
+        print("Combining TDOA and AOA estimates...")
+        # Combine TDOA and AOA estimates using weighted average
+        estimated_position = self._combine_tdoa_aoa_estimates(
+            tdoa_position, aoa_position, tdoa_metrics, aoa_metrics
+        )
+
+        # Combine quality metrics
+        quality_metrics = {
+            'tdoa_metrics': tdoa_metrics,
+            'aoa_metrics': aoa_metrics,
+            'tdoa_position': tdoa_position.tolist(),
+            'aoa_position': aoa_position.tolist(),
+            'combined_position': estimated_position.tolist(),
+            'fusion_method': 'weighted_average'
+        }
 
         print(f"Estimated drone position: {estimated_position}")
 
@@ -115,7 +139,8 @@ class DroneLocalizationSystem:
         # Recreate components with new config
         self.microphone_array = MicrophoneArray(config_dict=self.config)
         self.drone_signal_generator = DroneSignalGenerator(config_dict=self.config)
-        self.localizer = TDOALocalizer(config_dict=self.config)
+        self.tdoa_localizer = TDOALocalizer(config_dict=self.config)
+        self.aoa_localizer = AOALocalizer(config_dict=self.config)
 
     def save_config(self, filename: str = 'config_modified.json'):
         """Save current configuration to file."""
@@ -135,3 +160,35 @@ class DroneLocalizationSystem:
             'speed_of_sound': self.speed_of_sound,
             'noise_level': self.noise_level
         }
+
+    def _combine_tdoa_aoa_estimates(self, tdoa_pos: np.ndarray, aoa_pos: np.ndarray,
+                                   tdoa_metrics: Dict, aoa_metrics: Dict) -> np.ndarray:
+        """Combine TDOA and AOA position estimates using weighted fusion."""
+
+        # Calculate confidence weights based on method characteristics
+        tdoa_weight = 0.7  # TDOA generally more reliable for position estimation
+        aoa_weight = 0.3   # AOA provides directional information
+
+        # Adjust weights based on signal frequency (AOA works better at higher frequencies)
+        frequency = aoa_metrics.get('frequency_used', 440)
+        if frequency > 1000:  # Higher frequency
+            aoa_weight = 0.4
+            tdoa_weight = 0.6
+        elif frequency < 300:  # Lower frequency
+            aoa_weight = 0.2
+            tdoa_weight = 0.8
+
+        # Normalize weights
+        total_weight = tdoa_weight + aoa_weight
+        tdoa_weight /= total_weight
+        aoa_weight /= total_weight
+
+        # Weighted combination
+        combined_position = tdoa_weight * tdoa_pos + aoa_weight * aoa_pos
+
+        print(f"Fusion weights - TDOA: {tdoa_weight:.2f}, AOA: {aoa_weight:.2f}")
+        print(f"TDOA position: {tdoa_pos}")
+        print(f"AOA position: {aoa_pos}")
+        print(f"Combined position: {combined_position}")
+
+        return combined_position

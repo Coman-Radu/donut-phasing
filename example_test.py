@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """
-Example test script for drone localization using TDOA with microphone arrays.
+Example test script for drone localization using TDOA and AOA with microphone arrays.
 
 This script demonstrates:
-1. Basic drone localization with default configuration
+1. Basic drone localization with default configuration (TDOA + AOA)
 2. Testing different signal types (sine, complex harmonics)
 3. Testing different drone positions
 4. Testing with varying noise levels
 5. Performance evaluation with GPS synchronization effects
+6. Comparison between TDOA and AOA methods
 """
 
 import numpy as np
@@ -18,7 +19,7 @@ from drone_localization_system import DroneLocalizationSystem
 def test_basic_localization():
     """Test basic drone localization with default configuration."""
     print("=" * 60)
-    print("Test 1: Basic Drone Localization")
+    print("Test 1: Basic Drone Localization (TDOA + AOA Fusion)")
     print("=" * 60)
 
     # Create system with default configuration
@@ -27,12 +28,33 @@ def test_basic_localization():
     # Run simulation
     true_pos, estimated_pos, metrics = system.run_simulation()
 
+    # Calculate errors for individual methods and combined result
+    tdoa_error = np.linalg.norm(np.array(metrics['tdoa_position']) - true_pos)
+    aoa_error = np.linalg.norm(np.array(metrics['aoa_position']) - true_pos)
+    combined_error = np.linalg.norm(np.array(metrics['combined_position']) - true_pos)
+
+    print(f"\nLocalization Results:")
+    print(f"True position: {true_pos}")
+    print(f"TDOA only: {metrics['tdoa_position']} (error: {tdoa_error:.3f}m)")
+    print(f"AOA only: {metrics['aoa_position']} (error: {aoa_error:.3f}m)")
+    print(f"Combined: {metrics['combined_position']} (error: {combined_error:.3f}m)")
+
+    # Display fusion information
+    print(f"\nFusion Method: {metrics['fusion_method']}")
+
+    # Display AOA-specific metrics
+    aoa_metrics = metrics['aoa_metrics']
+    print(f"\nAOA Analysis:")
+    print(f"Frequency used: {aoa_metrics['frequency_used']:.1f} Hz")
+    print(f"Phase differences: {[f'{pd:.3f}' for pd in aoa_metrics['phase_differences']]}")
+    print(f"Calculated angles: {[f'{a:.3f}' for a in aoa_metrics['angles']]}")
+
     # Plot results
     system.plot_results(true_pos, estimated_pos)
 
     # Print system info
     info = system.get_system_info()
-    print(f"System Info: {json.dumps(info, indent=2)}")
+    print(f"\nSystem Info: {json.dumps(info, indent=2)}")
 
     return true_pos, estimated_pos
 
@@ -59,12 +81,17 @@ def test_different_signal_types():
         # Run simulation
         true_pos, estimated_pos, metrics = system.run_simulation()
 
-        error = np.linalg.norm(estimated_pos - true_pos)
+        combined_error = np.linalg.norm(np.array(metrics['combined_position']) - true_pos)
+        tdoa_error = np.linalg.norm(np.array(metrics['tdoa_position']) - true_pos)
+        aoa_error = np.linalg.norm(np.array(metrics['aoa_position']) - true_pos)
+
         results[signal_type] = {
             'true_position': true_pos.tolist(),
-            'estimated_position': estimated_pos.tolist(),
-            'error': error,
-            'tdoas': metrics['tdoas']
+            'combined_position': metrics['combined_position'],
+            'combined_error': combined_error,
+            'tdoa_error': tdoa_error,
+            'aoa_error': aoa_error,
+            'aoa_frequency': metrics['aoa_metrics']['frequency_used']
         }
 
         # Plot results
@@ -72,7 +99,10 @@ def test_different_signal_types():
 
     print("\nSignal Type Comparison:")
     for signal_type, result in results.items():
-        print(f"{signal_type}: Error = {result['error']:.3f} meters")
+        print(f"{signal_type}:")
+        print(f"  Combined TDOA+AOA error: {result['combined_error']:.3f} meters")
+        print(f"  (TDOA only: {result['tdoa_error']:.3f}m, AOA only: {result['aoa_error']:.3f}m)")
+        print(f"  AOA frequency: {result['aoa_frequency']:.1f} Hz")
 
     return results
 
