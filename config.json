@@ -28,7 +28,7 @@
     }
   },
   "drone": {
-    "position": [2.5, 1.5],
+    "position": [5.0, 5.0],
     "signal_type": "sine",
     "signal_config": {
       "sine": {

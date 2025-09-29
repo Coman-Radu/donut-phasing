@@ -115,14 +115,23 @@ def test_multiple_positions():
 
     system = DroneLocalizationSystem('config.json')
 
-    # Test positions around the microphone array
+    # Test positions around the microphone arrays (including much further distances)
     test_positions = [
-        [2.5, 1.5],   # Original position
-        [1.0, 1.0],   # Inside array
-        [3.0, 0.0],   # To the right
-        [0.0, 3.0],   # Above
-        [-1.0, -1.0], # Bottom left
-        [4.0, 4.0]    # Far corner
+        [2.5, 1.5],   # Original position (close to Array 1)
+        [1.0, 1.0],   # Inside Array 1
+        [3.0, 0.0],   # To the right of Array 1
+        [0.0, 3.0],   # Above Array 1
+        [-1.0, -1.0], # Bottom left of Array 1
+        [4.0, 4.0],   # Between arrays
+        [9.0, 9.0],   # Close to Array 2
+        [12.0, 12.0], # Beyond Array 2
+        [5.0, 15.0],  # Far above both arrays
+        [15.0, 5.0],  # Far to the right
+        [-5.0, 5.0],  # Far to the left
+        [5.0, -5.0],  # Far below Array 1
+        [20.0, 20.0], # Very far position
+        [25.0, 5.0],  # Very far horizontal
+        [5.0, 25.0]   # Very far vertical
     ]
 
     results = []
